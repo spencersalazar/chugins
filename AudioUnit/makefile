@@ -11,7 +11,7 @@ PublicUtility/CABufferList.cpp
 OBJCXX_MODULES=AudioUnit.mm
 
 # where the chuck source code is
-CK_SRC_PATH?=../../chuck/trunk/src/
+CK_SRC_PATH?=../chuck/include/
 
 
 # ---------------------------------------------------------------------------- #
@@ -115,5 +115,5 @@ install: $(CHUG)
 	chmod 755 $(CHUGIN_PATH)/$(CHUG)
 
 clean: 
-	rm -rf $(C_OBJECTS) $(CXX_OBJECTS) $(CHUG)
+	rm -rf $(C_OBJECTS) $(OBJCXX_OBJECTS) $(CXX_OBJECTS) $(CHUG)
 

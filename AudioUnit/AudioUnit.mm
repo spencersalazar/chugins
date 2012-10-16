@@ -140,8 +140,12 @@ public:
         m_fs = fs;
         m_timestamp.mSampleTime = 0;
         m_timestamp.mFlags = kAudioTimeStampSampleTimeValid;
+        
         m_au = NULL;
+        
         m_buffer = NULL;
+        m_renderBufferSize = 64;
+        m_bufferPos = 0;
     }
     
     ~CKAudioUnit()
@@ -155,17 +159,59 @@ public:
         if(!m_au)
             return TRUE;
         
-        OSStatus result = AudioUnitRender(m_au, NULL, &m_timestamp, 0,
-                                          nframes,
-                                          &m_buffer->GetModifiableBufferList());
-        
-        Float32 * left = (Float32 *) m_buffer->GetBufferList().mBuffers[0].mData;
-        Float32 * right = (Float32 *) m_buffer->GetBufferList().mBuffers[1].mData;
-        
-        for(int i = 0; i < nframes; i++)
+        if(m_renderBufferSize == 0)
         {
-            out[i*2] = left[i];
-            out[i*2+1] = right[i];
+            OSStatus result = AudioUnitRender(m_au, NULL, &m_timestamp, 0,
+                                              nframes,
+                                              &m_buffer->GetModifiableBufferList());
+            
+            const Float32 * left = (Float32 *) m_buffer->GetBufferList().mBuffers[0].mData;
+            const Float32 * right = (Float32 *) m_buffer->GetBufferList().mBuffers[1].mData;
+            
+            for(int i = 0; i < nframes; i++)
+            {
+                out[i*2] = left[i];
+                out[i*2+1] = right[i];
+            }
+        }
+        else
+        {
+            const Float32 * left = (Float32 *) m_buffer->GetBufferList().mBuffers[0].mData;
+            const Float32 * right = (Float32 *) m_buffer->GetBufferList().mBuffers[1].mData;
+            
+            int frameNum = 0;
+            int framesAvailable = m_buffer->GetBufferList().mBuffers[0].mDataByteSize/sizeof(Float32) - m_bufferPos;
+            int framesToCopy = MIN(nframes, framesAvailable);
+            
+            for(; frameNum < framesToCopy; frameNum++)
+            {
+                out[frameNum*2] = left[m_bufferPos + frameNum];
+                out[frameNum*2+1] = right[m_bufferPos + frameNum];
+            }
+            
+            m_bufferPos += framesToCopy;
+            
+            while(frameNum < nframes)
+            {
+                OSStatus result = AudioUnitRender(m_au, NULL, &m_timestamp, 0,
+                                                  m_renderBufferSize,
+                                                  &m_buffer->GetModifiableBufferList());
+                m_bufferPos = 0;
+                
+                left = (Float32 *) m_buffer->GetBufferList().mBuffers[0].mData;
+                right = (Float32 *) m_buffer->GetBufferList().mBuffers[1].mData;
+                
+                framesToCopy = MIN(nframes-frameNum, m_renderBufferSize);
+                
+                for(int i = 0; i < framesToCopy; i++)
+                {
+                    out[frameNum+i*2] = left[i];
+                    out[frameNum+i*2+1] = right[i];
+                }
+                
+                frameNum += framesToCopy;
+                m_bufferPos += framesToCopy;
+            }
         }
         
         m_timestamp.mSampleTime += nframes;
@@ -262,6 +308,9 @@ private:
     AudioUnit m_au;
     AudioTimeStamp m_timestamp;
     AudioStreamBasicDescription m_format;
+    
+    t_CKUINT m_renderBufferSize;
+    t_CKUINT m_bufferPos;
     CABufferList * m_buffer;
 };
 
