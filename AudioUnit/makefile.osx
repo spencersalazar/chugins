@@ -9,6 +9,6 @@ LDFLAGS+=-shared -lstdc++ $(addprefix -framework ,$(FRAMEWORKS)) \
 -ObjC $(ARCHOPTS) \
 -Wl,-undefined,dynamic_lookup
 
-LD=gcc
-CXX=g++
+LD=clang
+CXX=clang++
 OBJCXX=clang++

@@ -11,8 +11,12 @@
 #include "chuck_type.h"
 
 #include <AudioUnit/AudioUnit.h>
+#include <AudioUnit/AudioUnitCarbonView.h>
 #include <CoreAudio/CoreAudio.h>
 #include <CoreAudioKit/CoreAudioKit.h>
+#include <Foundation/Foundation.h>
+#include <Cocoa/Cocoa.h>
+#include <Carbon/Carbon.h>
 
 #include "PublicUtility/CAComponent.h"
 #include "PublicUtility/CABufferList.h"
@@ -38,6 +42,7 @@ CK_DLL_TICKF(audiounit_tickf);
 
 CK_DLL_MFUN(audiounit_open);
 CK_DLL_MFUN(audiounit_send);
+CK_DLL_MFUN(audiounit_display);
 
 // this is a special offset reserved for Chugin internal data
 t_CKINT audiounit_data_offset = 0;
@@ -126,6 +131,131 @@ protected:
     bool m_loadedComponents;
     map<string, CAComponentDescription> m_names;
 };
+
+
+@interface CKAudioUnitHelper : NSObject
+{
+    AudioUnit m_au;
+    NSWindow * m_window;
+}
+
+// call on any thread
+- (id)initWithAudioUnit:(AudioUnit)au;
+// only call on main thread
+- (void)display;
+
+@end
+
+
+@implementation CKAudioUnitHelper
+
+// call on any thread
+- (id)initWithAudioUnit:(AudioUnit)au
+{
+    if(self = [super init])
+    {
+        m_au = au;
+        m_window = nil;
+    }
+    
+    return self;
+}
+
+// only call on main thread
+- (void)display
+{
+    if(m_window == nil)
+    {
+//        NSRect r = NSMakeRect(0, 0, 500, 500);
+//        m_window = [[NSWindow alloc] initWithContentRect:r
+//                                               styleMask:NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask
+//                                                 backing:NSBackingStoreBuffered
+//                                                   defer:YES];
+//        [m_window setReleasedWhenClosed:NO];
+////        [m_window setContentView:[[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 500, 500)] autorelease]];
+//        [m_window center];
+    }
+    
+#if !__LP64__
+//    WindowRef carbonWindow = (WindowRef) [m_window windowRef];
+    OSStatus result;
+    
+    HIWindowRef carbonWindow;
+    
+    Rect windowRect = { 0, 0, 500, 500 };
+    result = CreateNewWindow(kDocumentWindowClass,
+                             kWindowStandardHandlerAttribute |
+                             kWindowCloseBoxAttribute |
+                             kWindowCollapseBoxAttribute |
+                             kWindowCompositingAttribute,
+                             &windowRect, &carbonWindow);
+        
+    CreateRootControl(carbonWindow, NULL);
+    ControlRef rootControl = NULL;
+    GetRootControl(carbonWindow, &rootControl);
+    
+    UInt32 dataSize;
+    Boolean isWritable;
+    AudioComponentDescription * carbonViewDescs = NULL;
+    UInt32 numComponents;
+    
+    result = AudioUnitGetPropertyInfo(m_au,
+                                      kAudioUnitProperty_GetUIComponentList,
+                                      kAudioUnitScope_Global,
+                                      0,
+                                      &dataSize,
+                                      &isWritable );
+    
+    numComponents = dataSize/sizeof(AudioComponentDescription);
+    carbonViewDescs = new AudioComponentDescription[numComponents];
+    
+    result = AudioUnitGetProperty(m_au,
+                                  kAudioUnitProperty_GetUIComponentList,
+                                  kAudioUnitScope_Global,
+                                  0,
+                                  carbonViewDescs,
+                                  &dataSize);
+    
+    AudioComponent uiComponent = AudioComponentFindNext(NULL, &carbonViewDescs[0]);
+    AudioComponentInstance uiComponentInstance;
+    AudioComponentInstanceNew(uiComponent, &uiComponentInstance);
+    
+    ControlRef auControl;
+    Float32Point auLoc = { 0, 0 };
+    Float32Point auSize = { 500, 500 };
+    result = AudioUnitCarbonViewCreate(uiComponentInstance, m_au, carbonWindow, rootControl,
+                                       &auLoc, &auSize, &auControl);
+    
+    Rect controlRect;
+    GetControlBounds(auControl, &controlRect);
+
+    SizeWindow(carbonWindow, controlRect.right - controlRect.left,
+               controlRect.bottom - controlRect.top, true);
+    
+//    ActivateControl(auControl);
+//    EnableControl(auControl);
+    
+//    ActivateWindow(carbonWindow, true);
+//    BringToFront(carbonWindow);
+    
+    m_window = [[NSWindow alloc] initWithWindowRef:carbonWindow];
+    
+//    Rect controlRect;
+//    GetControlBounds(auControl, &controlRect);
+//    [m_window setFrame:[m_window frameRectForContentRect:NSMakeRect(0, 0,
+//                                                                    controlRect.right - controlRect.left,
+//                                                                    controlRect.bottom - controlRect.top)]
+//               display:YES];
+
+#endif
+    
+    [m_window center];
+    [m_window makeKeyAndOrderFront:nil];
+    [m_window display];
+}
+
+@end
+
 
 
 // class definition for internal Chugin data
@@ -301,6 +431,16 @@ public:
             return FALSE;
     }
     
+    t_CKBOOL display()
+    {
+        CKAudioUnitHelper * helper = [[CKAudioUnitHelper alloc] initWithAudioUnit:m_au];
+        [helper performSelectorOnMainThread:@selector(display)
+                                 withObject:nil
+                              waitUntilDone:NO];
+        
+        return TRUE;
+    }
+    
 private:
     
     float m_fs;
@@ -313,6 +453,7 @@ private:
     t_CKUINT m_bufferPos;
     CABufferList * m_buffer;
 };
+
 
 
 // query function: chuck calls this when loading the Chugin
@@ -348,6 +489,8 @@ CK_DLL_QUERY( AudioUnit )
     QUERY->add_arg(QUERY, "int", "data1");
     QUERY->add_arg(QUERY, "int", "data2");
     QUERY->add_arg(QUERY, "int", "data3");
+    
+    QUERY->add_mfun(QUERY, audiounit_display, "void", "display");
     
     // this reserves a variable in the ChucK internal class to store
     // referene to the c++ class we defined above
@@ -432,5 +575,11 @@ CK_DLL_MFUN(audiounit_send)
     t_CKINT data3 = GET_NEXT_INT(ARGS);
     
     RETURN->v_int = c->send_midi(data1, data2, data3);
+}
+
+CK_DLL_MFUN(audiounit_display)
+{
+    CKAudioUnit * c = (CKAudioUnit *) OBJ_MEMBER_INT(SELF, audiounit_data_offset);
+    c->display();
 }
 
