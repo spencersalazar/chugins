@@ -206,11 +206,12 @@ void keyboardFunc( unsigned char key, int x, int y )
         {
             case 'Q':
             case 'q':
-                exit(1);
+                exit(0);
                 break;
                 
             case 'f':
             case 'F':
+            case '\x06':
                 toggleFullScreen();
                 break;
         }
