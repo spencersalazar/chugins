@@ -6,11 +6,19 @@
 // this should align with the correct versions of these ChucK files
 #include "chuck_dl.h"
 #include "chuck_def.h"
+#include "chuck_oo.h"
+#include "chuck_type.h"
+#include "chuck_instr.h"
+#include "util_thread.h"
 
 // general includes
 #include <stdio.h>
 #include <limits.h>
 
+#include <vector>
+#include <list>
+
+using namespace std;
 
 #ifdef __MACOSX_CORE__
 // note: for mac only
@@ -21,6 +29,8 @@
 #include <GL/glut.h>
 #endif
 
+#include "Geometry.h"
+
 Chuck_DL_MainThreadHook * g_hook = NULL;
 
 GLsizei g_width = 1024;
@@ -28,6 +38,120 @@ GLsizei g_height = 768;
 
 GLsizei g_lastWindowedWidth = g_width;
 GLsizei g_lastWindowedHeight = g_height;
+
+namespace ChuGL
+{
+    
+    XMutex g_gmutex;
+
+    class GGen : public Chuck_Object
+    {
+    public:
+        
+        GGen();
+        virtual ~GGen();
+        
+        virtual void update(float dt, float t);
+        virtual void state();
+        virtual void geometry();
+        virtual void unstate();
+        
+        void system_update(float dt, float t);
+        void system_render();
+        
+        void add(GGen * child)
+        {
+            g_gmutex.acquire();
+            m_children.push_back(child);
+            g_gmutex.release();
+        }
+        
+        GLvertex3f m_position;
+        GLcolor4f m_color;
+        
+    private:
+        list<GGen *> m_children;
+        
+    };
+
+    GGen::GGen()
+    {
+        m_position = GLvertex3f(0, 0, 0);
+        m_color = GLcolor4f(0, 0, 0, 1);
+    }
+    
+    GGen::~GGen() { }
+    
+    void GGen::update(float dt, float t)
+    {
+        
+    }
+
+    void GGen::state()
+    {
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+        
+        glTranslatef(m_position.x, m_position.y, m_position.z);
+        glColor4f(m_color.r, m_color.g, m_color.b, m_color.a);
+    }
+    
+    void GGen::geometry()
+    {
+        
+    }
+    
+    void GGen::unstate()
+    {
+        glPopMatrix();
+    }
+    
+    void GGen::system_update(float dt, float t)
+    {
+        update(dt, t);
+        
+        for(list<GGen *>::iterator i = m_children.begin();
+            i != m_children.end(); i++)
+        {
+            (*i)->update(dt, t);
+        }
+    }
+    
+    void GGen::system_render()
+    {
+        state();
+        
+        for(list<GGen *>::iterator i = m_children.begin();
+            i != m_children.end(); i++)
+        {
+            (*i)->system_render();
+        }
+        
+        geometry();
+        
+        unstate();
+    }
+    
+    Chuck_Object * g_objFbd = NULL;
+    GGen * g_fbd = NULL;
+    
+    class GGen_Line : public GGen
+    {
+    public:
+        virtual void geometry()
+        {
+            glBegin(GL_LINES);
+            glVertex3f(0, 0, 0);
+            glVertex3f(m_endpoint.x-m_position.x,
+                       m_endpoint.y-m_position.y,
+                       m_endpoint.z-m_position.z);
+            glEnd();
+        }
+        
+        GLvertex3f m_endpoint;
+    };
+}
+
 
 //-----------------------------------------------------------------------------
 // Name: reshapeFunc( )
@@ -39,6 +163,10 @@ void reshapeFunc( GLsizei w, GLsizei h )
     g_width = w; g_height = h;
     // map the view port to the client area
     glViewport( 0, 0, w, h );
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    float aspect = ((float)w)/((float)h);
+    glOrtho(-aspect, -1, aspect, 1, -0.1, 10);
 }
 
 
@@ -124,6 +252,7 @@ void timerFunc(int value)
 }
 
 
+double g_now = 0;
 
 
 //-----------------------------------------------------------------------------
@@ -132,11 +261,37 @@ void timerFunc(int value)
 //-----------------------------------------------------------------------------
 void displayFunc( )
 {
-    glClearColor( 1.0, 0.0, 0.0, 1.0 );
+    glClearColor( 0.0, 0.0, 0.0, 1.0 );
     glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
     
-    glFlush( );
-    glutSwapBuffers( );
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_SMOOTH);
+    
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    float aspect = ((float)g_width)/((float)g_height);
+    glOrtho(-aspect, aspect, -1, 1, -1, 1);
+
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    
+    double dt = 1.0/30.0;
+    
+    ChuGL::g_gmutex.acquire();
+    
+    ChuGL::g_fbd->system_update(dt, g_now);
+    ChuGL::g_fbd->system_render();
+    
+    ChuGL::g_gmutex.release();
+    
+    g_now += dt;
+    
+    glFlush();
+    glutSwapBuffers();
 }
 
 
@@ -154,7 +309,7 @@ t_CKBOOL glut_main_thread_hook( void * bindle )
     // set the window postion
     glutInitWindowPosition( 100, 100 );
     // create the window
-    glutCreateWindow( "GlucK2" );
+    glutCreateWindow( "chuck" );
     
     // set the idle function - called when idle
     //glutIdleFunc( idleFunc );
@@ -170,36 +325,54 @@ t_CKBOOL glut_main_thread_hook( void * bindle )
     glutPassiveMotionFunc(motionFunc);
     
     glutTimerFunc(1000/30, timerFunc, 1);
-
+    
+    reshapeFunc(g_width, g_height);
+    
+    //toggleFullScreen();
+    
     glutMainLoop();
+    
+    return TRUE;
 }
 
 t_CKBOOL glut_main_thread_quit( void * bindle )
 {
+    exit(0);
+    
+    return TRUE;
 }
 
-class GlucK2
-{
-public:
-    GlucK2() { }
-};
 
 // declaration of chugin constructor
-CK_DLL_CTOR(gluck2_ctor);
+CK_DLL_CTOR(ggen_ctor);
 // declaration of chugin desctructor
-CK_DLL_DTOR(gluck2_dtor);
+CK_DLL_DTOR(ggen_dtor);
+// chuck overload
+CK_DLL_CHUCK(ggen_chuck);
+// position
+CK_DLL_MFUN(ggen_position);
+// color
+CK_DLL_MFUN(ggen_color);
+
+CK_DLL_SFUN(ggen_fbd);
+
+// declaration of chugin constructor
+CK_DLL_CTOR(gline_ctor);
+// endpoint
+CK_DLL_MFUN(gline_endpoint);
+
 
 // this is a special offset reserved for Chugin internal data
-t_CKINT gluck2_data_offset = 0;
+t_CKINT ggen_data_offset = 0;
 
 
 // query function: chuck calls this when loading the Chugin
 // NOTE: developer will need to modify this function to
 // add additional functions to this Chugin
-CK_DLL_QUERY( GlucK2 )
+CK_DLL_QUERY( ChuGL )
 {
     // hmm, don't change this...
-    QUERY->setname(QUERY, "GlucK2");
+    QUERY->setname(QUERY, "ChuGL");
     
     g_hook = QUERY->create_main_thread_hook(QUERY, glut_main_thread_hook,
                                             glut_main_thread_quit, NULL);
@@ -207,50 +380,154 @@ CK_DLL_QUERY( GlucK2 )
     g_hook->activate(g_hook);
     
     // begin the class definition
-    // can change the second argument to extend a different ChucK class
-    QUERY->begin_class(QUERY, "GlucK2", "Object");
-
+    QUERY->begin_class(QUERY, "GGen", "Object");
+    
     // register the constructor (probably no need to change)
-    QUERY->add_ctor(QUERY, gluck2_ctor);
+    QUERY->add_ctor(QUERY, ggen_ctor);
     // register the destructor (probably no need to change)
-    QUERY->add_dtor(QUERY, gluck2_dtor);
+    QUERY->add_dtor(QUERY, ggen_dtor);
+    // data
+    ggen_data_offset = QUERY->add_mvar(QUERY, "int", "@ggen_data", FALSE);
+    // => operator overload
+    QUERY->add_ck_func(QUERY, ggen_chuck, "GGen");
+    // position
+    QUERY->add_mfun(QUERY, ggen_position, "void", "position");
+    QUERY->add_arg(QUERY, "float", "x");
+    QUERY->add_arg(QUERY, "float", "y");
+    QUERY->add_arg(QUERY, "float", "z");
+    // color
+    QUERY->add_mfun(QUERY, ggen_color, "void", "color");
+    QUERY->add_arg(QUERY, "float", "r");
+    QUERY->add_arg(QUERY, "float", "g");
+    QUERY->add_arg(QUERY, "float", "b");
+    QUERY->add_arg(QUERY, "float", "a");
+    
+    QUERY->add_sfun(QUERY, ggen_fbd, "GGen", "fbd");
     
     // end the class definition
-    // IMPORTANT: this MUST be called!
     QUERY->end_class(QUERY);
+    
+    // begin the class definition
+    QUERY->begin_class(QUERY, "GLine", "GGen");
+    
+    // register the constructor (probably no need to change)
+    QUERY->add_ctor(QUERY, gline_ctor);
+    // endpoint
+    QUERY->add_mfun(QUERY, gline_endpoint, "void", "endpoint");
+    QUERY->add_arg(QUERY, "float", "x");
+    QUERY->add_arg(QUERY, "float", "y");
+    QUERY->add_arg(QUERY, "float", "z");
 
-    // wasn't that a breeze?
+    // end the class definition
+    QUERY->end_class(QUERY);
+    
+    ChuGL::g_fbd = new ChuGL::GGen();
+    
     return TRUE;
 }
 
 
 // implementation for the constructor
-CK_DLL_CTOR(gluck2_ctor)
+CK_DLL_CTOR(ggen_ctor)
 {
     // get the offset where we'll store our internal c++ class pointer
-    OBJ_MEMBER_INT(SELF, gluck2_data_offset) = 0;
+    OBJ_MEMBER_INT(SELF, ggen_data_offset) = 0;
     
     // instantiate our internal c++ class representation
-    GlucK2 * bcdata = new GlucK2();
+    ChuGL::GGen * gg = new ChuGL::GGen();
     
     // store the pointer in the ChucK object member
-    OBJ_MEMBER_INT(SELF, gluck2_data_offset) = (t_CKINT) bcdata;
+    OBJ_MEMBER_INT(SELF, ggen_data_offset) = (t_CKINT) gg;
 }
 
 
 // implementation for the destructor
-CK_DLL_DTOR(gluck2_dtor)
+CK_DLL_DTOR(ggen_dtor)
 {
     // get our c++ class pointer
-    GlucK2 * bcdata = (GlucK2 *) OBJ_MEMBER_INT(SELF, gluck2_data_offset);
+    ChuGL::GGen * gg = (ChuGL::GGen *) OBJ_MEMBER_INT(SELF, ggen_data_offset);
     // check it
-    if( bcdata )
+    if( gg )
     {
         // clean up
-        delete bcdata;
-        OBJ_MEMBER_INT(SELF, gluck2_data_offset) = 0;
-        bcdata = NULL;
+        delete gg;
+        OBJ_MEMBER_INT(SELF, ggen_data_offset) = 0;
+        gg = NULL;
     }
+}
+
+
+CK_DLL_CHUCK(ggen_chuck)
+{
+    ChuGL::GGen * to = (ChuGL::GGen *) OBJ_MEMBER_INT(SELF, ggen_data_offset);
+    ChuGL::GGen * from = (ChuGL::GGen *) OBJ_MEMBER_INT(FROM, ggen_data_offset);
+    
+    to->add(from);
+    
+    return TRUE;
+}
+
+
+CK_DLL_MFUN(ggen_position)
+{
+    ChuGL::GGen * gg = (ChuGL::GGen *) OBJ_MEMBER_INT(SELF, ggen_data_offset);
+    
+    float x = GET_NEXT_FLOAT(ARGS);
+    float y = GET_NEXT_FLOAT(ARGS);
+    float z = GET_NEXT_FLOAT(ARGS);
+    
+    gg->m_position = GLvertex3f(x, y, z);
+}
+
+
+CK_DLL_MFUN(ggen_color)
+{
+    ChuGL::GGen * gg = (ChuGL::GGen *) OBJ_MEMBER_INT(SELF, ggen_data_offset);
+    
+    float r = GET_NEXT_FLOAT(ARGS);
+    float g = GET_NEXT_FLOAT(ARGS);
+    float b = GET_NEXT_FLOAT(ARGS);
+    float a = GET_NEXT_FLOAT(ARGS);
+    
+    gg->m_color = GLcolor4f(r, g, b, a);
+}
+
+
+CK_DLL_SFUN(ggen_fbd)
+{
+    if(ChuGL::g_objFbd == NULL)
+    {
+        ChuGL::g_objFbd = instantiate_and_initialize_object(type_engine_find_type(Chuck_Env::instance(), str2list("GGen")),
+                                                            SHRED);
+        OBJ_MEMBER_INT(ChuGL::g_objFbd, ggen_data_offset) = (t_CKINT) ChuGL::g_fbd;
+    }
+    
+    RETURN->v_object = ChuGL::g_objFbd;
+}
+
+
+CK_DLL_CTOR(gline_ctor)
+{
+    // get the offset where we'll store our internal c++ class pointer
+    OBJ_MEMBER_INT(SELF, ggen_data_offset) = 0;
+    
+    // instantiate our internal c++ class representation
+    ChuGL::GGen_Line * gl = new ChuGL::GGen_Line();
+    
+    // store the pointer in the ChucK object member
+    OBJ_MEMBER_INT(SELF, ggen_data_offset) = (t_CKINT) gl;
+}
+
+
+CK_DLL_MFUN(gline_endpoint)
+{
+    ChuGL::GGen_Line * gl = (ChuGL::GGen_Line *) OBJ_MEMBER_INT(SELF, ggen_data_offset);
+    
+    float x = GET_NEXT_FLOAT(ARGS);
+    float y = GET_NEXT_FLOAT(ARGS);
+    float z = GET_NEXT_FLOAT(ARGS);
+    
+    gl->m_endpoint = GLvertex3f(x, y, z);
 }
 
 
