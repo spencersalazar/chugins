@@ -31,6 +31,7 @@ using namespace std;
 
 #include "Geometry.h"
 
+
 Chuck_DL_MainThreadHook * g_hook = NULL;
 
 GLsizei g_width = 1024;
@@ -66,31 +67,50 @@ namespace ChuGL
             g_gmutex.release();
         }
         
+        GLvertex3f setPosition(GLvertex3f p)
+        {
+            m_nextPosition = p;
+            return p;
+        }
+        
+        GLcolor4f setColor(GLcolor4f c)
+        {
+            m_nextColor = c;
+            return c;
+        }
+        
+    protected:
         GLvertex3f m_position;
         GLcolor4f m_color;
         
     private:
         list<GGen *> m_children;
+        GLcolor4f m_savedColor;
         
+        GLvertex3f m_nextPosition;
+        GLcolor4f m_nextColor;
     };
 
     GGen::GGen()
     {
-        m_position = GLvertex3f(0, 0, 0);
-        m_color = GLcolor4f(0, 0, 0, 1);
+        m_position = m_nextPosition = GLvertex3f(0, 0, 0);
+        m_color = m_nextColor = GLcolor4f(0, 0, 0, 1);
     }
     
     GGen::~GGen() { }
     
     void GGen::update(float dt, float t)
     {
-        
+        m_position = m_nextPosition;
+        m_color = m_nextColor;
     }
 
     void GGen::state()
     {
         glMatrixMode(GL_MODELVIEW);
         glPushMatrix();
+        
+        glGetFloatv(GL_CURRENT_COLOR, (float *) &m_savedColor);
         
         glTranslatef(m_position.x, m_position.y, m_position.z);
         glColor4f(m_color.r, m_color.g, m_color.b, m_color.a);
@@ -103,7 +123,10 @@ namespace ChuGL
     
     void GGen::unstate()
     {
+        glMatrixMode(GL_MODELVIEW);
         glPopMatrix();
+        
+        glColor4fv((const float *) &m_savedColor);
     }
     
     void GGen::system_update(float dt, float t)
@@ -138,17 +161,39 @@ namespace ChuGL
     class GGen_Line : public GGen
     {
     public:
+        virtual void update(float dt, float t)
+        {
+            GGen::update(dt, t);
+            
+            m_endpoint = m_nextEndpoint;
+        }
+        
+        virtual void state()
+        {
+            GGen::state();
+            
+            glTranslatef(m_endpoint.x, m_endpoint.y, m_endpoint.z);
+        }
+        
         virtual void geometry()
         {
             glBegin(GL_LINES);
             glVertex3f(0, 0, 0);
-            glVertex3f(m_endpoint.x-m_position.x,
-                       m_endpoint.y-m_position.y,
-                       m_endpoint.z-m_position.z);
+            glVertex3f(m_position.x-m_endpoint.x,
+                       m_position.y-m_endpoint.y,
+                       m_position.z-m_endpoint.z);
             glEnd();
         }
         
+        GLvertex3f setEndpoint(GLvertex3f e)
+        {
+            m_nextEndpoint = e;
+            return m_nextEndpoint;
+        }
+        
+    protected:
         GLvertex3f m_endpoint;
+        GLvertex3f m_nextEndpoint;
     };
 }
 
@@ -463,6 +508,8 @@ CK_DLL_CHUCK(ggen_chuck)
     ChuGL::GGen * to = (ChuGL::GGen *) OBJ_MEMBER_INT(SELF, ggen_data_offset);
     ChuGL::GGen * from = (ChuGL::GGen *) OBJ_MEMBER_INT(FROM, ggen_data_offset);
     
+    FROM->add_ref();
+    
     to->add(from);
     
     return TRUE;
@@ -477,7 +524,7 @@ CK_DLL_MFUN(ggen_position)
     float y = GET_NEXT_FLOAT(ARGS);
     float z = GET_NEXT_FLOAT(ARGS);
     
-    gg->m_position = GLvertex3f(x, y, z);
+    gg->setPosition(GLvertex3f(x, y, z));
 }
 
 
@@ -490,7 +537,7 @@ CK_DLL_MFUN(ggen_color)
     float b = GET_NEXT_FLOAT(ARGS);
     float a = GET_NEXT_FLOAT(ARGS);
     
-    gg->m_color = GLcolor4f(r, g, b, a);
+    gg->setColor(GLcolor4f(r, g, b, a));
 }
 
 
@@ -528,7 +575,7 @@ CK_DLL_MFUN(gline_endpoint)
     float y = GET_NEXT_FLOAT(ARGS);
     float z = GET_NEXT_FLOAT(ARGS);
     
-    gl->m_endpoint = GLvertex3f(x, y, z);
+    gl->setEndpoint(GLvertex3f(x, y, z));
 }
 
 
