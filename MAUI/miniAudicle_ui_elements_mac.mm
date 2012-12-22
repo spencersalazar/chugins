@@ -195,6 +195,8 @@ t_CKBOOL Element::destroy()
                                      withObject:nil
                                   waitUntilDone:YES];
     
+    native_element = NULL;
+    
     return TRUE;    
 }
 
@@ -307,8 +309,13 @@ t_CKBOOL Element::set_position( t_CKFLOAT x, t_CKFLOAT y )
 
 - (void)destroy
 {
-    [panel close];
-    [panel release];
+    if(panel != nil)
+    {
+        [panel close];
+        [panel release];
+        panel = nil;
+    }
+    
     [self autorelease];
 }
 
@@ -406,6 +413,8 @@ t_CKBOOL View::destroy()
                                   withObject:nil
                                waitUntilDone:YES];
     
+    native_view = NULL;
+    
     return TRUE;
 }
 
@@ -437,7 +446,7 @@ t_CKBOOL View::remove_element( Element * e )
         if( elements[i] == e )
         {
             elements[i]->remove_parent( this );
-            elements[i] = NULL;
+            elements[i] = NULL; // SPENCERTODO: why not use list<> and remove?
         }
     }
     
