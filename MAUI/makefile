@@ -9,7 +9,7 @@ miniAudicle_ui_elements.cpp
 OBJCXX_MODULES=chuck_ui_mac.mm miniAudicle_ui_elements_mac.mm
 
 # where the chuck source code is
-CK_SRC_PATH?=/Users/spencer/src/chuck/branches/ui2/
+CK_SRC_PATH?=/Users/spencer/src/chuck/trunk/src/
 
 
 # ---------------------------------------------------------------------------- #
