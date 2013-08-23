@@ -37,6 +37,22 @@
 
 #include <string>
 
+
+#ifdef __MAUI_CHUGIN__
+
+/* redefine Obj-C class names to prevent errors when loaded in miniAudicle */
+#define mAFlippedView mAChuginFlippedView
+#define mAUIElement mAUIChuginElement
+#define mAUIView mAUIChuginView
+#define mAUISlider mAUIChuginSlider
+#define mAUIButton mAUIChuginButton
+#define mAUILED mAUIChuginLED
+#define mAUIText mAUIChuginText
+#define mAUIGauge mAUIChuginGauge
+
+#endif // __MAUI_CHUGIN__
+
+
 //namespace miniAudicle
 //{
 namespace UI
