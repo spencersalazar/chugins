@@ -252,7 +252,15 @@ CK_DLL_CTOR( mauielement_ctor )
 
 // destructor
 CK_DLL_DTOR( mauielement_dtor )
-{ }
+{
+    UI::Element * maui = (UI::Element *)OBJ_MEMBER_INT(SELF, mauielement_offset_data);
+    if( maui )
+    {
+        maui->destroy();
+        delete maui;
+        OBJ_MEMBER_INT(SELF, mauielement_offset_data) = 0;
+    }
+}
 
 // display
 CK_DLL_MFUN( mauielement_display )
@@ -277,7 +285,11 @@ CK_DLL_MFUN( mauielement_destroy )
 {
     UI::Element * maui = (UI::Element *)OBJ_MEMBER_INT(SELF, mauielement_offset_data);
     if( maui )
+    {
         maui->destroy();
+        delete maui;
+        OBJ_MEMBER_INT(SELF, mauielement_offset_data) = 0;
+    }
 }
 
 // name
@@ -469,9 +481,12 @@ CK_DLL_CTOR( maslider_ctor )
 CK_DLL_DTOR( maslider_dtor )
 {
     UI::Slider * slider = (UI::Slider *)OBJ_MEMBER_INT(SELF, mauielement_offset_data);
-    slider->destroy();
-    delete slider;
-    OBJ_MEMBER_INT(SELF, mauielement_offset_data) = 0;
+    if(slider)
+    {
+        slider->destroy();
+        delete slider;
+        OBJ_MEMBER_INT(SELF, mauielement_offset_data) = 0;
+    }
 }
 
 // value
@@ -625,9 +640,12 @@ CK_DLL_CTOR( mauiview_ctor )
 CK_DLL_DTOR( mauiview_dtor )
 {
     UI::View * view = (UI::View *)OBJ_MEMBER_INT(SELF, mauielement_offset_data);
-    view->destroy();
-    delete view;
-    OBJ_MEMBER_INT(SELF, mauielement_offset_data) = 0;
+    if(view)
+    {
+        view->destroy();
+        delete view;
+        OBJ_MEMBER_INT(SELF, mauielement_offset_data) = 0;
+    }
 }
 
 // add_element
@@ -703,9 +721,12 @@ CK_DLL_CTOR( mauibutton_ctor )
 CK_DLL_DTOR( mauibutton_dtor )
 {
     UI::Button * button = (UI::Button *)OBJ_MEMBER_INT(SELF, mauielement_offset_data);
-    button->destroy();
-    delete button;
-    OBJ_MEMBER_INT(SELF, mauielement_offset_data) = 0;
+    if(button)
+    {
+        button->destroy();
+        delete button;
+        OBJ_MEMBER_INT(SELF, mauielement_offset_data) = 0;
+    }
 }
 
 // state
@@ -816,9 +837,12 @@ CK_DLL_CTOR( mauiled_ctor )
 CK_DLL_DTOR( mauiled_dtor )
 {
     UI::LED * led = (UI::LED *)OBJ_MEMBER_INT(SELF, mauielement_offset_data);
-    led->destroy();
-    delete led;
-    OBJ_MEMBER_INT(SELF, mauielement_offset_data) = 0;
+    if(led)
+    {
+        led->destroy();
+        delete led;
+        OBJ_MEMBER_INT(SELF, mauielement_offset_data) = 0;
+    }
 }
 
 // light
@@ -894,9 +918,12 @@ CK_DLL_CTOR( mauitext_ctor )
 CK_DLL_DTOR( mauitext_dtor )
 {
     UI::Text * text = (UI::Text *)OBJ_MEMBER_INT(SELF, mauielement_offset_data);
-    text->destroy();
-    delete text;
-    OBJ_MEMBER_INT(SELF, mauielement_offset_data) = 0;
+    if(text)
+    {
+        text->destroy();
+        delete text;
+        OBJ_MEMBER_INT(SELF, mauielement_offset_data) = 0;
+    }
 }
 
 // MAUI_Gauge implementation
