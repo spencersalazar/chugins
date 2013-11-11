@@ -1,8 +1,8 @@
-MAUI_Slider slider;
-slider.display();
+//MAUI_Slider slider;
+//slider.display();
 
 // synchronize to period
-1.25::second => dur T;
+1.15::second => dur T;
 T - (now % T) => now;
 
 // list available AUs
@@ -18,12 +18,12 @@ for(int i; i < aus.cap(); i++)
 // setup patch
 AudioUnit au => NRev reverb => dac;
 // open General MIDI synth
-//au.open("DLSMusaicDevice");
-au.open("Massive");
+au.open("DLSMusicDevice");
+//au.open("Massive");
 // set reverb
 0.1 => reverb.mix;
 // display UI
-au.display();
+//au.display();
 
 // set program (voice)
 if(me.args())
@@ -34,7 +34,7 @@ if(me.args())
 
 while(true)
 {
-    34 + Math.random2(0,1)*12 + scale[Math.random2(0,4)] => int note;
+    52 + Math.random2(0,1)*12 + scale[Math.random2(0,4)] => int note;
     // noteOn
     au.send(0x90, note, 127);
     
