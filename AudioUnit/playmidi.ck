@@ -2,16 +2,14 @@
 NRev reverb => dac;
 0.01 => reverb.mix;
 
-57 => int voice;
-
 MidiFileIn min;
 MidiMsg msg;
 
-string filename;
-if(me.args() == 0)
-    me.sourceDir() + "/bwv772.mid" => filename;
-else
-    me.arg(0) => filename;
+me.sourceDir() + "/bwv772.mid" => string filename;
+if(me.args() > 0) me.arg(0) => filename;
+
+0 => int voice;
+if(me.args() > 1) me.arg(1) => Std.atoi => voice;
 
 if(!min.open(filename))
 {

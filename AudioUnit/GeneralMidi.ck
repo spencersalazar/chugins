@@ -1,6 +1,7 @@
 
 public class GeneralMidi extends Chubgraph
 {
+    AudioUnit.list();
     // setup patch
     AudioUnit au => outlet;
     // open General MIDI synth
