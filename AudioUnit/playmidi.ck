@@ -6,10 +6,10 @@ MidiFileIn min;
 MidiMsg msg;
 
 me.sourceDir() + "/bwv772.mid" => string filename;
-if(me.args() > 0) me.arg(0) => filename;
+if(me.args() > 1) me.arg(1) => filename;
 
 0 => int voice;
-if(me.args() > 1) me.arg(1) => Std.atoi => voice;
+if(me.args() > 0) me.arg(0) => Std.atoi => voice;
 
 if(!min.open(filename))
 {
