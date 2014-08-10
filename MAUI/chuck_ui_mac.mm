@@ -194,4 +194,10 @@ void Chuck_UI_Manager::shutdown()
 
 @end
 
+extern "C"
+void Chuck_UI_Manager_start()
+{
+    Chuck_UI_Manager::instance()->start();
+}
+
 
