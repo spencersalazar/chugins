@@ -189,7 +189,7 @@ void Chuck_UI_Manager::shutdown()
 
 - (void)quit
 {
-    if(g_vm) g_vm->stop(); // termination of vm will cause application exit
+    if(g_vm) g_vm->shutdown(); // termination of vm will cause application exit
 }
 
 @end
