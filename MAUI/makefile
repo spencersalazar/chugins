@@ -62,6 +62,8 @@ ifneq (,$(strip $(filter win32,$(MAKECMDGOALS))))
 include makefile.win32
 endif
 
+FLAGS+=-I$(CK_SRC_PATH)
+
 ifneq ($(CHUCK_DEBUG),)
 FLAGS+= -g
 else

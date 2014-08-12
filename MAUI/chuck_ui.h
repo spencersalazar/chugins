@@ -34,6 +34,8 @@
 #define __CHUCK_UI_H__
 
 #include "chuck_dl.h"
+#include "chuck_def.h"
+
 
 class Chuck_UI_Manager
 {
@@ -56,11 +58,18 @@ public:
 private:
     Chuck_UI_Manager();
     
+    void main_thread_init();
+    
+    struct platform_data;
+    
     bool m_hookActivated;
     bool m_doStart;
     bool m_hasStarted;
+    bool m_hasMainThreadInit;
     bool m_doShutdown;
     Chuck_DL_MainThreadHook * m_hook;
+    
+    platform_data *m_platformData;
 };
 
 #endif 

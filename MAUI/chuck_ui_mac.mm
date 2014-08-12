@@ -56,6 +56,15 @@ static Chuck_UI_Controller * g_ui_controller = nil;
 
 @end
 
+
+struct Chuck_UI_Manager::platform_data
+{
+    platform_data() : m_app(nil) { }
+    
+    NSApplication * m_app;
+};
+
+
 Chuck_UI_Manager * Chuck_UI_Manager::instance()
 {
     if(g_ui_manager == NULL)
@@ -63,7 +72,7 @@ Chuck_UI_Manager * Chuck_UI_Manager::instance()
     return g_ui_manager;
 }
 
-Chuck_UI_Manager::Chuck_UI_Manager()
+Chuck_UI_Manager::Chuck_UI_Manager() : m_platformData(new platform_data)
 {
     init();
     
@@ -75,27 +84,21 @@ void Chuck_UI_Manager::init()
     m_hasStarted = false;
     m_doStart = false;
     m_doShutdown = false;
+    m_hasMainThreadInit = false;
     m_hookActivated = false;
     m_hook = NULL;
 }
 
-void Chuck_UI_Manager::run()
+void Chuck_UI_Manager::main_thread_init()
 {
-    while( !m_doStart && !m_doShutdown )
-    {
-        // TODO: semaphore?
-        usleep(10000);
-    }
+    assert([NSThread isMainThread]);
     
-    if( m_doShutdown )
+    if(m_hasMainThreadInit)
         return;
     
-    m_doStart = false;
+    NSLog(@"main thread init...");
     
-    // TODO: handle case where VM shuts down before this function finishes,
-    // which seems to cause crashes
-    
-    NSAutoreleasePool * arpool = [NSAutoreleasePool new];
+    m_hasMainThreadInit = true;
     
     NSAutoreleasePool * temp_pool = [NSAutoreleasePool new];
     
@@ -130,6 +133,7 @@ void Chuck_UI_Manager::run()
     
     [chuckMenu addItem:[NSMenuItem separatorItem]];
     
+    
     menuItem = [[[NSMenuItem new] initWithTitle:@"Quit" 
                                          action:NULL
                                   keyEquivalent:@"q"]
@@ -139,15 +143,39 @@ void Chuck_UI_Manager::run()
     [chuckMenu addItem:menuItem];
     
     [app setMainMenu:mainMenu];
-    
+        
     [app activateIgnoringOtherApps:YES];
     
+    m_platformData->m_app = app;
+    
     [temp_pool release];
+}
+
+void Chuck_UI_Manager::run()
+{
+    NSLog(@"Chuck_UI_Manager::run");
+    
+    while( !m_doStart && !m_doShutdown )
+    {
+        // TODO: semaphore?
+        usleep(10000);
+    }
+    
+    if( m_doShutdown )
+        return;
+    
+    // TODO: handle case where VM shuts down before this function finishes,
+    // which seems to cause crashes
+    
+    NSAutoreleasePool * arpool = [NSAutoreleasePool new];
+    
+    main_thread_init();
     
     m_hasStarted = true;
     m_doStart = false;
     
-    [app run];
+    NSLog(@"running...");
+    [[NSApplication sharedApplication] run];
     
     [arpool release];
     
@@ -164,7 +192,13 @@ void Chuck_UI_Manager::start()
     }
     
     if( !m_hasStarted )
+    {
+        // if main thread
+        if([NSThread isMainThread])
+            main_thread_init();
+        
         m_doStart = true;
+    }
 }
 
 void Chuck_UI_Manager::shutdown()
