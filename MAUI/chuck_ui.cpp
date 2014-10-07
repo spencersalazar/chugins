@@ -23,58 +23,26 @@
  -----------------------------------------------------------------------------*/
 
 //-----------------------------------------------------------------------------
-// file: chuck_ui.h
-// desc: UI setup
+// file: chuck_ui.cpp
+// desc: generic ui boilerplate
 //
-// author: Spencer Salazar (spencer@ccrma.stanford.edu
-// date: October 2011
+// author: Spencer Salazar (spencer@ccrma.stanford.edu)
+// date: October 2014
 //-----------------------------------------------------------------------------
 
-#ifndef __CHUCK_UI_H__
-#define __CHUCK_UI_H__
+#include "chuck_ui.h"
 
-#include "chuck_dl.h"
-#include "chuck_def.h"
-
-
-class Chuck_UI_Manager
+extern "C"
+void Chuck_UI_Manager_init()
 {
-public:
-    static Chuck_UI_Manager * instance();
-    
-    // init before starting the VM
-    void init();
-    void main_thread_init();
-    // run in a parallel thread to the VM
-    // wait for VM thread to make calls to UI functions before bringing up UI
-    void run();
-    
-    // actually bring up the UI
-    void start();
-    // shutdown the UI
-    void shutdown();
-    
-    void set_hook(Chuck_DL_MainThreadHook * hook) { m_hook = hook; }
-    
-private:
-    Chuck_UI_Manager();
-    
-    struct platform_data;
-    
-    bool m_hookActivated;
-    bool m_doStart;
-    bool m_hasStarted;
-    bool m_hasMainThreadInit;
-    bool m_doShutdown;
-    Chuck_DL_MainThreadHook * m_hook;
-    
-    platform_data *m_platformData;
-};
+    Chuck_UI_Manager::instance()->main_thread_init();
+}
 
 extern "C"
-void Chuck_UI_Manager_init();
-extern "C"
-void Chuck_UI_Manager_start();
+void Chuck_UI_Manager_start()
+{
+    Chuck_UI_Manager::instance()->start();
+}
 
 
-#endif 
+

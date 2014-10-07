@@ -5,7 +5,7 @@ CHUGIN_NAME=MAUI
 # all of the c/cpp files that compose this chugin
 C_MODULES=
 CXX_MODULES=MAUI.cpp util_icon.cpp miniAudicle_import.cpp \
-miniAudicle_ui_elements.cpp
+miniAudicle_ui_elements.cpp chuck_ui.cpp
 OBJCXX_MODULES=chuck_ui_mac.mm miniAudicle_ui_elements_mac.mm
 
 # where the chuck source code is

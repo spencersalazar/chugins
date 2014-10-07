@@ -36,6 +36,7 @@
 #import <Foundation/Foundation.h>
 #import "chuck_vm.h"
 #import "chuck_globals.h"
+#import "chuck_errmsg.h"
 #import "util_icon.h"
 
 
@@ -91,12 +92,16 @@ void Chuck_UI_Manager::init()
 
 void Chuck_UI_Manager::main_thread_init()
 {
-    assert([NSThread isMainThread]);
+    if(![NSThread isMainThread])
+    {
+        EM_error3("chuck_ui: attempt to call main_thread_init from non-main thread!");
+        return;
+    }
     
     if(m_hasMainThreadInit)
         return;
     
-    NSLog(@"main thread init...");
+    EM_log(CK_LOG_INFO, "chuck_ui: initializing on main-thread");
     
     m_hasMainThreadInit = true;
     
@@ -153,8 +158,6 @@ void Chuck_UI_Manager::main_thread_init()
 
 void Chuck_UI_Manager::run()
 {
-    NSLog(@"Chuck_UI_Manager::run");
-    
     while( !m_doStart && !m_doShutdown )
     {
         // TODO: semaphore?
@@ -174,7 +177,8 @@ void Chuck_UI_Manager::run()
     m_hasStarted = true;
     m_doStart = false;
     
-    NSLog(@"running...");
+    EM_log(CK_LOG_INFO, "running chuck_ui");
+    
     [[NSApplication sharedApplication] run];
     
     [arpool release];
@@ -227,11 +231,5 @@ void Chuck_UI_Manager::shutdown()
 }
 
 @end
-
-extern "C"
-void Chuck_UI_Manager_start()
-{
-    Chuck_UI_Manager::instance()->start();
-}
 
 
