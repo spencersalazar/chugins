@@ -12,3 +12,6 @@ LDFLAGS+=-shared -lstdc++ $(addprefix -framework ,$(FRAMEWORKS)) \
 LD=clang++
 CXX=clang++
 OBJCXX=clang++
+
+MACOSX_DEPLOYMENT_TARGET=10.5
+export MACOSX_DEPLOYMENT_TARGET
