@@ -51,7 +51,8 @@ typedef enum {
     te_complex, te_polar, te_string, te_thread, te_shred, te_class,
     te_function, te_object, te_user, te_array, te_null, te_ugen, te_uana, 
     te_event, te_void, te_stdout, te_stderr, te_adc, te_dac, te_bunghole, 
-    te_uanablob, te_io, te_fileio, te_chout, te_cherr, te_multi
+    te_uanablob, te_io, te_fileio, te_chout, te_cherr, te_multi,
+    te_vec3, te_vec4, te_vector // ge: added 1.3.5.3
 } te_Type;
 
 
@@ -581,6 +582,8 @@ struct Chuck_Type : public Chuck_VM_Object
     
     // documentation
     std::string doc;
+    // example files
+    std::vector<std::string> examples;
 
 public:
     // constructor
@@ -742,10 +745,10 @@ struct Chuck_Func : public Chuck_VM_Object
     std::string name;
     // func def from parser
     a_Func_Def def;
-    // code
+    // code (included imported)
     Chuck_VM_Code * code;
     // imported code
-    Chuck_DL_Func * dl_code;
+    // Chuck_DL_Func * dl_code;
     // member
     t_CKBOOL is_member;
     // virtual table index
@@ -762,7 +765,7 @@ struct Chuck_Func : public Chuck_VM_Object
 
     // constructor
     Chuck_Func() { def = NULL; code = NULL; is_member = FALSE; vt_index = 0xffffffff; 
-                   value_ref = NULL; dl_code = NULL; next = NULL; up = NULL; }
+                   value_ref = NULL; /*dl_code = NULL;*/ next = NULL; up = NULL; }
 
     // destructor
     virtual ~Chuck_Func()
@@ -833,6 +836,9 @@ Chuck_Type * type_engine_import_ugen_begin( Chuck_Env * env, const char * name, 
                                             f_tick tick, f_pmsg pmsg,
                                             t_CKUINT num_ins = 0xffffffff, t_CKUINT num_outs = 0xffffffff,
                                             const char * doc = NULL );
+Chuck_Type * type_engine_import_ugen_begin( Chuck_Env * env, const char * name, const char * parent,
+                                            Chuck_Namespace * where, f_ctor pre_ctor, f_dtor dtor,
+                                            f_tick tick, f_pmsg pmsg,  const char * doc );
 Chuck_Type * type_engine_import_uana_begin( Chuck_Env * env, const char * name, const char * parent,
                                             Chuck_Namespace * where, f_ctor pre_ctor, f_dtor dtor,
                                             f_tick tick, f_tock tock, f_pmsg pmsg,
@@ -849,6 +855,7 @@ t_CKBOOL type_engine_import_svar( Chuck_Env * env, const char * type,
                                   t_CKUINT addr, const char * doc = NULL );
 t_CKBOOL type_engine_import_ugen_ctrl( Chuck_Env * env, const char * type, const char * name,
                                        f_ctrl ctrl, t_CKBOOL write, t_CKBOOL read );
+t_CKBOOL type_engine_import_add_ex( Chuck_Env * env, const char * ex );
 t_CKBOOL type_engine_import_class_end( Chuck_Env * env );
 t_CKBOOL type_engine_register_deprecate( Chuck_Env * env, 
                                          const std::string & former, const std::string & latter );
@@ -893,6 +900,9 @@ extern Chuck_Type t_time;
 extern Chuck_Type t_dur;
 extern Chuck_Type t_complex;
 extern Chuck_Type t_polar;
+extern Chuck_Type t_vec3; // ge: added 1.3.5.3
+extern Chuck_Type t_vec4; // ge: added 1.3.5.3
+extern Chuck_Type t_vector;
 extern Chuck_Type t_object;
 extern Chuck_Type t_null;
 extern Chuck_Type t_string;
