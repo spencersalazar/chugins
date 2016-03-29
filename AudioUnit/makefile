@@ -38,7 +38,7 @@ CXX=g++
 OBJCXX=g++
 LD=g++
 
-CHUGIN_PATH=/usr/lib/chuck
+CHUGIN_PATH=/usr/local/lib/chuck
 
 ifneq (,$(strip $(filter osx bin-dist-osx,$(MAKECMDGOALS))))
 include makefile.osx

@@ -4,10 +4,9 @@ ARCHOPTS=$(addprefix -arch ,$(ARCHS))
 
 FRAMEWORKS=Cocoa Foundation AudioUnit CoreAudio CoreFoundation
 
-FLAGS=-D__MACOSX_CORE__ -I$(CK_SRC_PATH) $(ARCHOPTS)
+FLAGS=-D__MACOSX_CORE__ -I$(CK_SRC_PATH) $(ARCHOPTS) -mmacosx-version-min=10.5
 LDFLAGS+=-shared -lstdc++ $(addprefix -framework ,$(FRAMEWORKS)) \
--ObjC $(ARCHOPTS) \
--Wl,-undefined,dynamic_lookup
+-ObjC $(ARCHOPTS) -Wl,-undefined,dynamic_lookup -mmacosx-version-min=10.5
 
 LD=clang
 CXX=clang++
