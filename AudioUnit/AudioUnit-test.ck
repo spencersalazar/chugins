@@ -1,9 +1,6 @@
 //MAUI_Slider slider;
 //slider.display();
 
-// synchronize to period
-1.15::second => dur T;
-T - (now % T) => now;
 
 // list available AUs
 AudioUnit.list() @=> string aus[];
@@ -18,12 +15,16 @@ for(int i; i < aus.cap(); i++)
 // setup patch
 AudioUnit au => NRev reverb => dac;
 // open General MIDI synth
-au.open("DLSMusicDevice");
-//au.open("Massive");
+//au.open("DLSMusicDevice");
+au.open("FM8");
 // set reverb
 0.1 => reverb.mix;
 // display UI
-//au.display();
+au.display();
+
+// synchronize to period
+1.075::second => dur T;
+T - (now % T) => now;
 
 // set program (voice)
 if(me.args())

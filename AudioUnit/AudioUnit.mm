@@ -11,7 +11,7 @@
 #include "chuck_type.h"
 
 #include <AudioUnit/AudioUnit.h>
-#include <AudioUnit/AudioUnitCarbonView.h>
+#include <AudioUnit/AUCocoaUIView.h>
 #include <CoreAudio/CoreAudio.h>
 #include <CoreAudioKit/CoreAudioKit.h>
 #include <Foundation/Foundation.h>
@@ -30,6 +30,9 @@
 
 using namespace std;
 
+void (*g_Chuck_UI_Manager_init)();
+void (*g_Chuck_UI_Manager_start)();
+
 // declaration of chugin constructor
 CK_DLL_CTOR(audiounit_ctor);
 // declaration of chugin desctructor
@@ -46,6 +49,15 @@ CK_DLL_MFUN(audiounit_display);
 
 // this is a special offset reserved for Chugin internal data
 t_CKINT audiounit_data_offset = 0;
+
+
+void dispatch_sync_noblock(dispatch_queue_t queue, dispatch_block_t block)
+{
+    if(dispatch_get_current_queue() == queue)
+        block();
+    else
+        dispatch_sync(queue, block);
+}
 
 
 class CKAudioUnitManager
@@ -166,88 +178,41 @@ protected:
 {
     if(m_window == nil)
     {
-//        NSRect r = NSMakeRect(0, 0, 500, 500);
-//        m_window = [[NSWindow alloc] initWithContentRect:r
-//                                               styleMask:NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask
-//                                                 backing:NSBackingStoreBuffered
-//                                                   defer:YES];
-//        [m_window setReleasedWhenClosed:NO];
-////        [m_window setContentView:[[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 500, 500)] autorelease]];
-//        [m_window center];
+       NSRect r = NSMakeRect(0, 0, 500, 500);
+       m_window = [[NSWindow alloc] initWithContentRect:r
+                                              styleMask:NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask
+                                                backing:NSBackingStoreBuffered
+                                                  defer:YES];
+       [m_window setReleasedWhenClosed:NO];
+       // [m_window setContentView:[[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 500, 500)] autorelease]];
+       [m_window center];
     }
-    
-#if !__LP64__
-//    WindowRef carbonWindow = (WindowRef) [m_window windowRef];
-    OSStatus result;
-    
-    HIWindowRef carbonWindow;
-    
-    Rect windowRect = { 0, 0, 500, 500 };
-    result = CreateNewWindow(kDocumentWindowClass,
-                             kWindowStandardHandlerAttribute |
-                             kWindowCloseBoxAttribute |
-                             kWindowCollapseBoxAttribute |
-                             kWindowCompositingAttribute,
-                             &windowRect, &carbonWindow);
-        
-    CreateRootControl(carbonWindow, NULL);
-    ControlRef rootControl = NULL;
-    GetRootControl(carbonWindow, &rootControl);
-    
-    UInt32 dataSize;
-    Boolean isWritable;
-    AudioComponentDescription * carbonViewDescs = NULL;
-    UInt32 numComponents;
-    
-    result = AudioUnitGetPropertyInfo(m_au,
-                                      kAudioUnitProperty_GetUIComponentList,
-                                      kAudioUnitScope_Global,
-                                      0,
-                                      &dataSize,
-                                      &isWritable );
-    
-    numComponents = dataSize/sizeof(AudioComponentDescription);
-    carbonViewDescs = new AudioComponentDescription[numComponents];
-    
-    result = AudioUnitGetProperty(m_au,
-                                  kAudioUnitProperty_GetUIComponentList,
-                                  kAudioUnitScope_Global,
-                                  0,
-                                  carbonViewDescs,
-                                  &dataSize);
-    
-    AudioComponent uiComponent = AudioComponentFindNext(NULL, &carbonViewDescs[0]);
-    AudioComponentInstance uiComponentInstance;
-    AudioComponentInstanceNew(uiComponent, &uiComponentInstance);
-    
-    ControlRef auControl;
-    Float32Point auLoc = { 0, 0 };
-    Float32Point auSize = { 500, 500 };
-    result = AudioUnitCarbonViewCreate(uiComponentInstance, m_au, carbonWindow, rootControl,
-                                       &auLoc, &auSize, &auControl);
-    
-    Rect controlRect;
-    GetControlBounds(auControl, &controlRect);
 
-    SizeWindow(carbonWindow, controlRect.right - controlRect.left,
-               controlRect.bottom - controlRect.top, true);
+    AudioUnitCocoaViewInfo auViewInfo;
+    auViewInfo.mCocoaAUViewBundleLocation = nil;
+    auViewInfo.mCocoaAUViewClass[0] = nil;
+    UInt32 dataSize = 1*sizeof(AudioUnitCocoaViewInfo);
     
-//    ActivateControl(auControl);
-//    EnableControl(auControl);
-    
-//    ActivateWindow(carbonWindow, true);
-//    BringToFront(carbonWindow);
-    
-    m_window = [[NSWindow alloc] initWithWindowRef:carbonWindow];
-    
-//    Rect controlRect;
-//    GetControlBounds(auControl, &controlRect);
-//    [m_window setFrame:[m_window frameRectForContentRect:NSMakeRect(0, 0,
-//                                                                    controlRect.right - controlRect.left,
-//                                                                    controlRect.bottom - controlRect.top)]
-//               display:YES];
+    OSStatus result = AudioUnitGetProperty(m_au, kAudioUnitProperty_CocoaUI, 
+        kAudioUnitScope_Global, 0, &auViewInfo, &dataSize);
+    if(result != noErr)
+    {
+        assert(0);
+    }
 
-#endif
+    // the host gets the path to the view bundle
+    NSURL *auBundleURL = (NSURL *) auViewInfo.mCocoaAUViewBundleLocation;
+    // the host gets the view's class name
+    NSString *auViewFactoryName = (NSString *) auViewInfo.mCocoaAUViewClass[0];
+
+    NSBundle *auBundle = [NSBundle bundleWithURL:auBundleURL];
+    Class auViewFactoryClass = [auBundle classNamed:auViewFactoryName];
+    id<AUCocoaUIBase> auViewFactory = [auViewFactoryClass new];
+    NSView *auView = [auViewFactory uiViewForAudioUnit:m_au
+                                              withSize:NSMakeSize(500, 500)];
+    
+    [m_window setContentSize:auView.frame.size];
+    m_window.contentView = auView;
     
     [m_window center];
     [m_window makeKeyAndOrderFront:nil];
@@ -265,15 +230,26 @@ class CKAudioUnit
 {
 public:
     // constructor
-    CKAudioUnit(t_CKFLOAT fs)
+    CKAudioUnit(t_CKFLOAT fs) : m_au(NULL), m_helper(nil), m_buffer(NULL), m_fs(fs)
     {
+        // first check if we are in miniAudicle
+        const char **MA_VERSION = (const char **) dlsym(RTLD_DEFAULT, "MA_VERSION");
+        if(MA_VERSION == NULL)
+        {
+            // find standalone UI hooks for MAUI.chug
+            g_Chuck_UI_Manager_init = (void (*)()) dlsym(RTLD_DEFAULT, "Chuck_UI_Manager_init");
+            g_Chuck_UI_Manager_start = (void (*)()) dlsym(RTLD_DEFAULT, "Chuck_UI_Manager_start");
+
+            if(g_Chuck_UI_Manager_init == NULL || g_Chuck_UI_Manager_start == NULL)
+            {
+                EM_error3("AudioUnit.chug: error: unable to find MAUI");
+            }
+        }
+        
         m_fs = fs;
         m_timestamp.mSampleTime = 0;
         m_timestamp.mFlags = kAudioTimeStampSampleTimeValid;
         
-        m_au = NULL;
-        
-        m_buffer = NULL;
         m_renderBufferSize = 64;
         m_bufferPos = 0;
     }
@@ -433,10 +409,19 @@ public:
     
     t_CKBOOL display()
     {
-        CKAudioUnitHelper * helper = [[CKAudioUnitHelper alloc] initWithAudioUnit:m_au];
-        [helper performSelectorOnMainThread:@selector(display)
-                                 withObject:nil
-                              waitUntilDone:NO];
+//        if(g_Chuck_UI_Manager_init != NULL)
+//            g_Chuck_UI_Manager_init();
+        if(g_Chuck_UI_Manager_start != NULL)
+            g_Chuck_UI_Manager_start();
+        
+        if(m_helper == nil)
+            m_helper = [[CKAudioUnitHelper alloc] initWithAudioUnit:m_au];
+        dispatch_sync_noblock(dispatch_get_main_queue(), ^{
+            [m_helper display];
+        });
+//        [helper performSelectorOnMainThread:@selector(display)
+//                                 withObject:nil
+//                              waitUntilDone:NO];
         
         return TRUE;
     }
@@ -452,6 +437,7 @@ private:
     t_CKUINT m_renderBufferSize;
     t_CKUINT m_bufferPos;
     CABufferList * m_buffer;
+    CKAudioUnitHelper * m_helper;
 };
 
 
